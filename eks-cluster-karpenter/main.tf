@@ -72,7 +72,8 @@ resource "aws_iam_role_policy_attachment" "eks_cluster_policies" {
     "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
     "arn:aws:iam::aws:policy/AmazonEKSServicePolicy",
     "arn:aws:iam::aws:policy/service-role/AmazonEFSCSIDriverPolicy",
-    "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+    "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy",
+    "arn:aws:iam::aws:policy/AmazonElasticFileSystemClientFullAccess"
   ])
   role       = aws_iam_role.eks_cluster_role.name
   policy_arn = each.value
@@ -181,7 +182,10 @@ resource "aws_iam_role_policy_attachment" "karpenter_controller_policies" {
     "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
     "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
     "arn:aws:iam::aws:policy/AmazonEC2FullAccess",
-    "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+    "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
+    "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+
+
   ])
   role       = aws_iam_role.karpenter_controller_role.name
   policy_arn = each.value
@@ -218,41 +222,6 @@ resource "aws_iam_instance_profile" "karpenter_node_profile" {
   name = "karpenter-node-instance-profile"
   role = aws_iam_role.karpenter_node_role.name
 }
-
-########################################################
-# KARPENTER INSTALLATION (HELM)
-########################################################
-
-#resource "helm_release" "karpenter" {
-#  name             = "karpenter"
-#  repository       = "oci://public.ecr.aws/karpenter/karpenter"
-#  chart            = "karpenter"
-#  namespace        = "karpenter"
-#  create_namespace = true
-#  version          = "21.8.0"    # <-- update this to a valid version
-#
-#  depends_on = [aws_eks_cluster.main]
-#
-#  set {
-#    name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
-#    value = aws_iam_role.karpenter_controller_role.arn
-#  }
-#
-#  set {
-#    name  = "settings.clusterName"
-#    value = aws_eks_cluster.main.name
-#  }
-#
-#  set {
-#    name  = "settings.clusterEndpoint"
-#    value = aws_eks_cluster.main.endpoint
-#  }
-#
-#  set {
-#    name  = "settings.interruptionQueueName"
-#    value = "karpenter-interruption-queue"
-#  }
-#}
 
 ########################################################
 # DATA SOURCES
@@ -312,4 +281,37 @@ resource "helm_release" "karpenter" {
 
   # optional but recommended to wait for webhook
   wait = true
+}
+
+########################################################
+# INSTALL NGINX INGRESS CONTROLLER VIA HELM
+########################################################
+
+resource "helm_release" "nginx_ingress" {
+  name             = "nginx-ingress"
+  repository       = "https://kubernetes.github.io/ingress-nginx"
+  chart            = "ingress-nginx"
+  namespace        = "ingress-nginx"
+  create_namespace = true
+  version          = "4.11.3" # latest stable version as of 2025
+
+  set {
+    name  = "controller.publishService.enabled"
+    value = "true"
+  }
+
+  set {
+    name  = "controller.service.type"
+    value = "LoadBalancer"
+  }
+
+  set {
+    name  = "controller.service.externalTrafficPolicy"
+    value = "Cluster"
+  }
+
+  depends_on = [
+    aws_eks_cluster.main,
+    helm_release.karpenter
+  ]
 }
