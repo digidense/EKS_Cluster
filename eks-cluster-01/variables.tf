@@ -54,3 +54,19 @@ variable "tags" {
     ManagedBy   = "Terraform"
   }
 }
+
+########################################################
+# EC2 INSTANCE VARIABLES
+########################################################
+
+variable "ec2_instance_type" {
+  description = "EC2 instance type"
+  type        = string
+  default     = "t2.small"
+}
+
+variable "ec2_instance_name" {
+  description = "Name for the EC2 instance"
+  type        = string
+  default     = "minimal-instance"
+}
