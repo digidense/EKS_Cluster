@@ -1,0 +1,29 @@
+[agent]
+expertMode = true
+
+[nix]
+channel = "stable-25_05"
+packages = ["opentofu"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Terraform Validate"
+
+[[workflows.workflow]]
+name = "Terraform Validate"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "echo \"=== EKS Cluster Terraform Project ===\" && echo \"\" && echo \"Validating eks-cluster-01...\" && cd eks-cluster-01 && tofu validate && echo \"\" && echo \"Validating eks-cluster-karpenter...\" && cd ../eks-cluster-karpenter && tofu validate && echo \"\" && echo \"All configurations valid!\" && echo \"\" && echo \"Run 'tofu plan' in either directory to preview changes.\" && echo \"Run 'tofu apply' to deploy (requires AWS credentials).\""
+
+[workflows.workflow.metadata]
+outputType = "console"
